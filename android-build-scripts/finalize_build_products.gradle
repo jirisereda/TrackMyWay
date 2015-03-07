@@ -1,0 +1,64 @@
+android {
+
+    task cleanBuildProducts << {
+        String apksDirPath = "$projectDir" + File.separator + ".." + File.separator + "apks"
+        if (new File(apksDirPath).exists()) {
+            ant.delete (includeEmptyDirs: 'true') {
+                fileset(dir: file(apksDirPath), includes: '*')
+            }
+        }
+    }
+    clean.dependsOn.add(cleanBuildProducts)
+
+    applicationVariants.all { variant ->
+
+        // variant outputs introduced in android gradle plugin v 0.14.3
+        variant.outputs.each { variantOutput ->
+
+            variantOutput.assemble << {
+
+                // <job-name>_<project-name>_<build-number>_R<svn-revision>_<build-type>_<flavor>.apk
+                String jobName = System.getenv()['JOB_NAME']
+                String projectName = project.name
+                String buildNumber = System.getenv()['BUILD_NUMBER']
+                String versionNumber = "99999"
+                String destinationDir = "$projectDir" + File.separator + ".." + File.separator + "apks"
+                new File(destinationDir).mkdirs()
+
+                String  sourceApkPath = variantOutput.packageApplication.outputFile.getAbsolutePath()
+
+
+                if (new File(sourceApkPath).exists()) {
+
+                    String targetApkName
+                    if (jobName != null) {
+                        targetApkName = jobName + "_" + projectName + "_"
+                    } else {
+                        targetApkName = projectName + "_"
+                    }
+                    if (buildNumber != null) {
+                        targetApkName += buildNumber + "_"
+                    }
+                    if (versionNumber != null) {
+                        targetApkName += "R" + versionNumber + "_"
+                    }
+                    targetApkName += variant.buildType.name
+                    for (flavor in variant.productFlavors) {
+                        targetApkName += "_" + flavor.name
+                    }
+                    targetApkName += ".apk"
+
+                    println "Copying " + sourceApkPath + " to " + destinationDir + File.separator +
+                            targetApkName
+
+                    project.copy {
+                        from sourceApkPath
+                        into destinationDir
+                        rename '.*', targetApkName
+                    }
+
+                }
+            }
+        }
+    }
+}
